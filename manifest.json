@@ -1,0 +1,7 @@
+{
+  "name": "vsql_trgm",
+  "version": "1.0.0",
+  "description": "Trigram-based text similarity search (pg_trgm port)",
+  "author": "VillageSQL Contributors",
+  "license": "GPL-2.0"
+}

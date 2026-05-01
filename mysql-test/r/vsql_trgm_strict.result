@@ -1,0 +1,49 @@
+# vsql_trgm: trgm_strict_word_similarity, trgm_strict_word_distance,
+#           trgm_strict_word_similar
+INSTALL EXTENSION vsql_trgm;
+#
+# trgm_strict_word_similarity — complete word boundary match
+#
+SELECT vsql_trgm.trgm_strict_word_similarity('cat', 'a cat sat on a mat');
+vsql_trgm.trgm_strict_word_similarity('cat', 'a cat sat on a mat')
+1
+SELECT vsql_trgm.trgm_strict_word_similarity('abc', 'xyz abc def');
+vsql_trgm.trgm_strict_word_similarity('abc', 'xyz abc def')
+1
+SELECT vsql_trgm.trgm_strict_word_similarity('hello', 'hello world');
+vsql_trgm.trgm_strict_word_similarity('hello', 'hello world')
+1
+#
+# trgm_strict_word_similarity — NULL handling
+#
+SELECT vsql_trgm.trgm_strict_word_similarity(NULL, 'hello world');
+vsql_trgm.trgm_strict_word_similarity(NULL, 'hello world')
+NULL
+SELECT vsql_trgm.trgm_strict_word_similarity('hello', NULL);
+vsql_trgm.trgm_strict_word_similarity('hello', NULL)
+NULL
+#
+# trgm_strict_word_distance
+#
+SELECT vsql_trgm.trgm_strict_word_distance('cat', 'a cat sat on a mat');
+vsql_trgm.trgm_strict_word_distance('cat', 'a cat sat on a mat')
+0
+SELECT vsql_trgm.trgm_strict_word_distance('hello', 'hello world');
+vsql_trgm.trgm_strict_word_distance('hello', 'hello world')
+0
+SELECT vsql_trgm.trgm_strict_word_distance(NULL, 'abc');
+vsql_trgm.trgm_strict_word_distance(NULL, 'abc')
+NULL
+#
+# trgm_strict_word_similar (default threshold 0.5)
+#
+SELECT vsql_trgm.trgm_strict_word_similar('cat', 'a cat sat on a mat');
+vsql_trgm.trgm_strict_word_similar('cat', 'a cat sat on a mat')
+1
+SELECT vsql_trgm.trgm_strict_word_similar('hello', 'hello world');
+vsql_trgm.trgm_strict_word_similar('hello', 'hello world')
+1
+SELECT vsql_trgm.trgm_strict_word_similar(NULL, 'hello world');
+vsql_trgm.trgm_strict_word_similar(NULL, 'hello world')
+NULL
+UNINSTALL EXTENSION vsql_trgm;

@@ -1,0 +1,55 @@
+--echo # vsql_trgm: trgm_show, trgm_similarity, trgm_distance
+
+INSTALL EXTENSION vsql_trgm;
+
+--echo #
+--echo # trgm_show
+--echo #
+SELECT vsql_trgm.trgm_show('cat');
+SELECT vsql_trgm.trgm_show('Cat');
+SELECT vsql_trgm.trgm_show('');
+SELECT vsql_trgm.trgm_show('a');
+SELECT vsql_trgm.trgm_show('hello world');
+SELECT vsql_trgm.trgm_show(NULL);
+
+--echo #
+--echo # trgm_similarity — identity and disjoint
+--echo #
+SELECT vsql_trgm.trgm_similarity('abc', 'abc');
+SELECT vsql_trgm.trgm_similarity('abc', 'xyz');
+SELECT vsql_trgm.trgm_similarity('', '');
+
+--echo #
+--echo # trgm_similarity — computed case: 'cat' vs 'bat' = 0.25
+--echo # cat: {  c, ca, cat, at } = 4 trigrams
+--echo # bat: {  b, ba, bat, at } = 4 trigrams; shared: {at } = 1
+--echo # Dice = 2*1/(4+4) = 0.25
+--echo #
+SELECT vsql_trgm.trgm_similarity('cat', 'bat');
+
+--echo #
+--echo # trgm_similarity — symmetry
+--echo #
+SELECT vsql_trgm.trgm_similarity('cat', 'bat') = vsql_trgm.trgm_similarity('bat', 'cat');
+
+--echo #
+--echo # trgm_similarity — NULL handling
+--echo #
+SELECT vsql_trgm.trgm_similarity(NULL, 'abc');
+SELECT vsql_trgm.trgm_similarity('abc', NULL);
+SELECT vsql_trgm.trgm_similarity(NULL, NULL);
+
+--echo #
+--echo # trgm_similarity — case insensitive
+--echo #
+SELECT vsql_trgm.trgm_similarity('CAT', 'cat');
+
+--echo #
+--echo # trgm_distance
+--echo #
+SELECT vsql_trgm.trgm_distance('abc', 'abc');
+SELECT vsql_trgm.trgm_distance('abc', 'xyz');
+SELECT vsql_trgm.trgm_distance('cat', 'bat');
+SELECT vsql_trgm.trgm_distance(NULL, 'abc');
+
+UNINSTALL EXTENSION vsql_trgm;

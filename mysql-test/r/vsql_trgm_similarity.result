@@ -1,0 +1,84 @@
+# vsql_trgm: trgm_show, trgm_similarity, trgm_distance
+INSTALL EXTENSION vsql_trgm;
+#
+# trgm_show
+#
+SELECT vsql_trgm.trgm_show('cat');
+vsql_trgm.trgm_show('cat')
+["  c"," ca","at ","cat"]
+SELECT vsql_trgm.trgm_show('Cat');
+vsql_trgm.trgm_show('Cat')
+["  c"," ca","at ","cat"]
+SELECT vsql_trgm.trgm_show('');
+vsql_trgm.trgm_show('')
+[]
+SELECT vsql_trgm.trgm_show('a');
+vsql_trgm.trgm_show('a')
+["  a"," a "]
+SELECT vsql_trgm.trgm_show('hello world');
+vsql_trgm.trgm_show('hello world')
+["  h","  w"," he"," wo","ell","hel","ld ","llo","lo ","orl","rld","wor"]
+SELECT vsql_trgm.trgm_show(NULL);
+vsql_trgm.trgm_show(NULL)
+NULL
+#
+# trgm_similarity — identity and disjoint
+#
+SELECT vsql_trgm.trgm_similarity('abc', 'abc');
+vsql_trgm.trgm_similarity('abc', 'abc')
+1
+SELECT vsql_trgm.trgm_similarity('abc', 'xyz');
+vsql_trgm.trgm_similarity('abc', 'xyz')
+0
+SELECT vsql_trgm.trgm_similarity('', '');
+vsql_trgm.trgm_similarity('', '')
+0
+#
+# trgm_similarity — computed case: 'cat' vs 'bat' = 0.25
+# cat: {  c, ca, cat, at } = 4 trigrams
+# bat: {  b, ba, bat, at } = 4 trigrams; shared: {at } = 1
+# Dice = 2*1/(4+4) = 0.25
+#
+SELECT vsql_trgm.trgm_similarity('cat', 'bat');
+vsql_trgm.trgm_similarity('cat', 'bat')
+0.25
+#
+# trgm_similarity — symmetry
+#
+SELECT vsql_trgm.trgm_similarity('cat', 'bat') = vsql_trgm.trgm_similarity('bat', 'cat');
+vsql_trgm.trgm_similarity('cat', 'bat') = vsql_trgm.trgm_similarity('bat', 'cat')
+1
+#
+# trgm_similarity — NULL handling
+#
+SELECT vsql_trgm.trgm_similarity(NULL, 'abc');
+vsql_trgm.trgm_similarity(NULL, 'abc')
+NULL
+SELECT vsql_trgm.trgm_similarity('abc', NULL);
+vsql_trgm.trgm_similarity('abc', NULL)
+NULL
+SELECT vsql_trgm.trgm_similarity(NULL, NULL);
+vsql_trgm.trgm_similarity(NULL, NULL)
+NULL
+#
+# trgm_similarity — case insensitive
+#
+SELECT vsql_trgm.trgm_similarity('CAT', 'cat');
+vsql_trgm.trgm_similarity('CAT', 'cat')
+1
+#
+# trgm_distance
+#
+SELECT vsql_trgm.trgm_distance('abc', 'abc');
+vsql_trgm.trgm_distance('abc', 'abc')
+0
+SELECT vsql_trgm.trgm_distance('abc', 'xyz');
+vsql_trgm.trgm_distance('abc', 'xyz')
+1
+SELECT vsql_trgm.trgm_distance('cat', 'bat');
+vsql_trgm.trgm_distance('cat', 'bat')
+0.75
+SELECT vsql_trgm.trgm_distance(NULL, 'abc');
+vsql_trgm.trgm_distance(NULL, 'abc')
+NULL
+UNINSTALL EXTENSION vsql_trgm;

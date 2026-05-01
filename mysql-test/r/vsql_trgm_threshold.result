@@ -1,0 +1,61 @@
+# vsql_trgm: trgm_similar and trgm_similar_threshold
+INSTALL EXTENSION vsql_trgm;
+#
+# trgm_similar (default threshold 0.3)
+#
+# similarity('cat','bat')=0.25 < 0.3 -> 0
+SELECT vsql_trgm.trgm_similar('cat', 'bat');
+vsql_trgm.trgm_similar('cat', 'bat')
+0
+# similarity('abc','abc')=1.0 >= 0.3 -> 1
+SELECT vsql_trgm.trgm_similar('abc', 'abc');
+vsql_trgm.trgm_similar('abc', 'abc')
+1
+# NULL -> NULL
+SELECT vsql_trgm.trgm_similar(NULL, 'abc');
+vsql_trgm.trgm_similar(NULL, 'abc')
+NULL
+SELECT vsql_trgm.trgm_similar('abc', NULL);
+vsql_trgm.trgm_similar('abc', NULL)
+NULL
+#
+# trgm_similar_threshold (explicit threshold)
+#
+# similarity=0.25 >= 0.2 -> 1
+SELECT vsql_trgm.trgm_similar_threshold('cat', 'bat', 0.2);
+vsql_trgm.trgm_similar_threshold('cat', 'bat', 0.2)
+1
+# similarity=0.25 < 0.3 -> 0
+SELECT vsql_trgm.trgm_similar_threshold('cat', 'bat', 0.3);
+vsql_trgm.trgm_similar_threshold('cat', 'bat', 0.3)
+0
+# threshold=0.0 -> always 1 (unless both empty)
+SELECT vsql_trgm.trgm_similar_threshold('cat', 'bat', 0.0);
+vsql_trgm.trgm_similar_threshold('cat', 'bat', 0.0)
+1
+# threshold=1.0 -> only identical
+SELECT vsql_trgm.trgm_similar_threshold('abc', 'abc', 1.0);
+vsql_trgm.trgm_similar_threshold('abc', 'abc', 1.0)
+1
+SELECT vsql_trgm.trgm_similar_threshold('cat', 'bat', 1.0);
+vsql_trgm.trgm_similar_threshold('cat', 'bat', 1.0)
+0
+# NULL threshold -> NULL
+SELECT vsql_trgm.trgm_similar_threshold('abc', 'abc', NULL);
+vsql_trgm.trgm_similar_threshold('abc', 'abc', NULL)
+NULL
+#
+# trgm_similar_threshold invalid threshold
+# VEF errors surface as Warning 3200 with NULL return value
+#
+SELECT vsql_trgm.trgm_similar_threshold('cat', 'bat', -0.1);
+vsql_trgm.trgm_similar_threshold('cat', 'bat', -0.1)
+NULL
+Warnings:
+Warning	3200	VDF error in function 'trgm_similar_threshold': trgm_similar_threshold: threshold must be between 0 and 1
+SELECT vsql_trgm.trgm_similar_threshold('cat', 'bat', 1.1);
+vsql_trgm.trgm_similar_threshold('cat', 'bat', 1.1)
+NULL
+Warnings:
+Warning	3200	VDF error in function 'trgm_similar_threshold': trgm_similar_threshold: threshold must be between 0 and 1
+UNINSTALL EXTENSION vsql_trgm;

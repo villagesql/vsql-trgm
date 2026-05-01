@@ -1,0 +1,38 @@
+--echo # vsql_trgm: trgm_similar and trgm_similar_threshold
+
+INSTALL EXTENSION vsql_trgm;
+
+--echo #
+--echo # trgm_similar (default threshold 0.3)
+--echo #
+--echo # similarity('cat','bat')=0.25 < 0.3 -> 0
+SELECT vsql_trgm.trgm_similar('cat', 'bat');
+--echo # similarity('abc','abc')=1.0 >= 0.3 -> 1
+SELECT vsql_trgm.trgm_similar('abc', 'abc');
+--echo # NULL -> NULL
+SELECT vsql_trgm.trgm_similar(NULL, 'abc');
+SELECT vsql_trgm.trgm_similar('abc', NULL);
+
+--echo #
+--echo # trgm_similar_threshold (explicit threshold)
+--echo #
+--echo # similarity=0.25 >= 0.2 -> 1
+SELECT vsql_trgm.trgm_similar_threshold('cat', 'bat', 0.2);
+--echo # similarity=0.25 < 0.3 -> 0
+SELECT vsql_trgm.trgm_similar_threshold('cat', 'bat', 0.3);
+--echo # threshold=0.0 -> always 1 (unless both empty)
+SELECT vsql_trgm.trgm_similar_threshold('cat', 'bat', 0.0);
+--echo # threshold=1.0 -> only identical
+SELECT vsql_trgm.trgm_similar_threshold('abc', 'abc', 1.0);
+SELECT vsql_trgm.trgm_similar_threshold('cat', 'bat', 1.0);
+--echo # NULL threshold -> NULL
+SELECT vsql_trgm.trgm_similar_threshold('abc', 'abc', NULL);
+
+--echo #
+--echo # trgm_similar_threshold invalid threshold
+--echo # VEF errors surface as Warning 3200 with NULL return value
+--echo #
+SELECT vsql_trgm.trgm_similar_threshold('cat', 'bat', -0.1);
+SELECT vsql_trgm.trgm_similar_threshold('cat', 'bat', 1.1);
+
+UNINSTALL EXTENSION vsql_trgm;

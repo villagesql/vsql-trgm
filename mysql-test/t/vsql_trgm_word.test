@@ -1,0 +1,43 @@
+--echo # vsql_trgm: trgm_word_similarity and trgm_word_distance
+
+INSTALL EXTENSION vsql_trgm;
+
+--echo #
+--echo # trgm_word_similarity — exact word match in longer string
+--echo #
+SELECT vsql_trgm.trgm_word_similarity('cat', 'a cat sat on a mat');
+SELECT vsql_trgm.trgm_word_similarity('hello', 'hello world');
+SELECT vsql_trgm.trgm_word_similarity('abc', 'xyz abc def');
+
+--echo #
+--echo # trgm_word_similarity — no match
+--echo #
+SELECT vsql_trgm.trgm_word_similarity('zzz', 'abc def ghi');
+
+--echo #
+--echo # trgm_word_similarity — identical single word
+--echo #
+SELECT vsql_trgm.trgm_word_similarity('cat', 'cat');
+
+--echo #
+--echo # trgm_word_similarity — NULL handling
+--echo #
+SELECT vsql_trgm.trgm_word_similarity(NULL, 'hello world');
+SELECT vsql_trgm.trgm_word_similarity('hello', NULL);
+
+--echo #
+--echo # trgm_word_distance — complement of word_similarity
+--echo #
+SELECT vsql_trgm.trgm_word_distance('cat', 'a cat sat on a mat');
+SELECT vsql_trgm.trgm_word_distance('hello', 'hello world');
+SELECT vsql_trgm.trgm_word_distance(NULL, 'abc');
+
+--echo #
+--echo # trgm_word_similar (default threshold 0.6)
+--echo #
+SELECT vsql_trgm.trgm_word_similar('cat', 'a cat sat on a mat');
+SELECT vsql_trgm.trgm_word_similar('hello', 'hello world');
+SELECT vsql_trgm.trgm_word_similar('zzz', 'abc def ghi');
+SELECT vsql_trgm.trgm_word_similar(NULL, 'hello world');
+
+UNINSTALL EXTENSION vsql_trgm;

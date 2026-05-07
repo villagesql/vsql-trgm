@@ -70,15 +70,15 @@ static std::vector<std::string> extract_ordered_trigrams(std::string_view input)
   return result;
 }
 
-// Dice coefficient: 2 * |A ∩ B| / (|A| + |B|)
-static double dice_similarity(const std::set<std::string>& a,
+// |A ∩ B| / max(|A|, |B|) — matches pg_trgm's default CALCSML formula.
+static double calc_similarity(const std::set<std::string>& a,
                                const std::set<std::string>& b) {
   if (a.empty() && b.empty()) return 0.0;
   size_t shared = 0;
   for (const auto& t : a) {
     if (b.count(t)) ++shared;
   }
-  return 2.0 * shared / (a.size() + b.size());
+  return static_cast<double>(shared) / std::max(a.size(), b.size());
 }
 
 // word_similarity: max over all contiguous windows of seq2 of
@@ -197,7 +197,7 @@ void trgm_similarity_impl(vef_context_t* ctx, vef_invalue_t* a, vef_invalue_t* b
     if (a->is_null || b->is_null) { result->type = VEF_RESULT_NULL; return; }
     auto ta = extract_trigrams(std::string_view(a->str_value, a->str_len));
     auto tb = extract_trigrams(std::string_view(b->str_value, b->str_len));
-    result->real_value = dice_similarity(ta, tb);
+    result->real_value = calc_similarity(ta, tb);
     result->type = VEF_RESULT_VALUE;
   } catch (...) {
     result->type = VEF_RESULT_ERROR;
@@ -215,7 +215,7 @@ void trgm_distance_impl(vef_context_t* ctx, vef_invalue_t* a, vef_invalue_t* b,
     if (a->is_null || b->is_null) { result->type = VEF_RESULT_NULL; return; }
     auto ta = extract_trigrams(std::string_view(a->str_value, a->str_len));
     auto tb = extract_trigrams(std::string_view(b->str_value, b->str_len));
-    result->real_value = 1.0 - dice_similarity(ta, tb);
+    result->real_value = 1.0 - calc_similarity(ta, tb);
     result->type = VEF_RESULT_VALUE;
   } catch (...) {
     result->type = VEF_RESULT_ERROR;
@@ -233,7 +233,7 @@ void trgm_similar_impl(vef_context_t* ctx, vef_invalue_t* a, vef_invalue_t* b,
     if (a->is_null || b->is_null) { result->type = VEF_RESULT_NULL; return; }
     auto ta = extract_trigrams(std::string_view(a->str_value, a->str_len));
     auto tb = extract_trigrams(std::string_view(b->str_value, b->str_len));
-    result->int_value = dice_similarity(ta, tb) >= 0.3 ? 1 : 0;
+    result->int_value = calc_similarity(ta, tb) >= 0.3 ? 1 : 0;
     result->type = VEF_RESULT_VALUE;
   } catch (...) {
     result->type = VEF_RESULT_ERROR;
@@ -260,7 +260,7 @@ void trgm_similar_threshold_impl(vef_context_t* ctx, vef_invalue_t* a,
     }
     auto ta = extract_trigrams(std::string_view(a->str_value, a->str_len));
     auto tb = extract_trigrams(std::string_view(b->str_value, b->str_len));
-    result->int_value = dice_similarity(ta, tb) >= threshold->real_value ? 1 : 0;
+    result->int_value = calc_similarity(ta, tb) >= threshold->real_value ? 1 : 0;
     result->type = VEF_RESULT_VALUE;
   } catch (...) {
     result->type = VEF_RESULT_ERROR;

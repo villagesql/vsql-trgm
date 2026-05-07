@@ -20,12 +20,19 @@ SELECT vsql_trgm.trgm_similarity('abc', 'xyz');
 SELECT vsql_trgm.trgm_similarity('', '');
 
 --echo #
---echo # trgm_similarity — computed case: 'cat' vs 'bat' = 0.25
+--echo # trgm_similarity — equal-length: 'cat' vs 'bat' = 0.25
 --echo # cat: {  c, ca, cat, at } = 4 trigrams
 --echo # bat: {  b, ba, bat, at } = 4 trigrams; shared: {at } = 1
---echo # Dice = 2*1/(4+4) = 0.25
+--echo # score = 1 / max(4,4) = 0.25
 --echo #
 SELECT vsql_trgm.trgm_similarity('cat', 'bat');
+
+--echo #
+--echo # trgm_similarity — unequal-length: 'cat' vs 'catalog' = 0.375
+--echo # cat: 4 trigrams; catalog: 8 trigrams; shared: {  c,  ca, cat} = 3
+--echo # score = 3 / max(4,8) = 0.375
+--echo #
+SELECT vsql_trgm.trgm_similarity('cat', 'catalog');
 
 --echo #
 --echo # trgm_similarity — symmetry

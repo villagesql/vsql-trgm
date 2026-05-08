@@ -394,7 +394,7 @@ void trgm_strict_word_similar_impl(vef_context_t* ctx, vef_invalue_t* a,
 // =============================================================================
 
 VEF_GENERATE_ENTRY_POINTS(
-  make_extension("vsql_trgm", "1.0.0")
+  make_extension()
     .func(make_func<&trgm_show_impl>("trgm_show")
       .returns(STRING).param(STRING).buffer_size(4096).build())
     .func(make_func<&trgm_similarity_impl>("trgm_similarity")

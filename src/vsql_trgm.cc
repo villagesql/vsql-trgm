@@ -14,7 +14,7 @@
  * along with this program; if not, see <https://www.gnu.org/licenses/>.
  */
 
-#include <villagesql/extension.h>
+#include <villagesql/vsql.h>
 
 #include <algorithm>
 #include <cctype>
@@ -24,8 +24,7 @@
 #include <string_view>
 #include <vector>
 
-using namespace villagesql::extension_builder;
-using namespace villagesql::func_builder;
+using namespace vsql;
 
 // =============================================================================
 // Core trigram algorithm
@@ -154,12 +153,11 @@ static double strict_word_sim(const std::set<std::string>& t1,
 // trgm_show(text) -> STRING  (sorted JSON array of trigrams)
 // =============================================================================
 
-void trgm_show_impl(vef_context_t* ctx, vef_invalue_t* arg,
-                    vef_vdf_result_t* result) {
+void trgm_show_impl(StringArg arg, StringResult result) {
   try {
-    if (arg->is_null) { result->type = VEF_RESULT_NULL; return; }
+    if (arg.is_null()) { result.set_null(); return; }
 
-    auto trgms = extract_trigrams(std::string_view(arg->str_value, arg->str_len));
+    auto trgms = extract_trigrams(arg.value());
 
     std::string out = "[";
     bool first = true;
@@ -172,18 +170,15 @@ void trgm_show_impl(vef_context_t* ctx, vef_invalue_t* arg,
     }
     out += ']';
 
-    if (out.size() > result->max_str_len) {
-      result->type = VEF_RESULT_ERROR;
-      snprintf(result->error_msg, VEF_MAX_ERROR_LEN,
-               "trgm_show: output too large (%zu bytes)", out.size());
+    auto buf = result.buffer();
+    if (out.size() > buf.size()) {
+      result.warning("trgm_show: output too large");
       return;
     }
-    memcpy(result->str_buf, out.data(), out.size());
-    result->actual_len = out.size();
-    result->type = VEF_RESULT_VALUE;
+    memcpy(buf.data(), out.data(), out.size());
+    result.set_length(out.size());
   } catch (...) {
-    result->type = VEF_RESULT_ERROR;
-    snprintf(result->error_msg, VEF_MAX_ERROR_LEN, "trgm_show: internal error");
+    result.warning("trgm_show: internal error");
   }
 }
 
@@ -191,17 +186,14 @@ void trgm_show_impl(vef_context_t* ctx, vef_invalue_t* arg,
 // trgm_similarity(text, text) -> REAL
 // =============================================================================
 
-void trgm_similarity_impl(vef_context_t* ctx, vef_invalue_t* a, vef_invalue_t* b,
-                          vef_vdf_result_t* result) {
+void trgm_similarity_impl(StringArg a, StringArg b, RealResult result) {
   try {
-    if (a->is_null || b->is_null) { result->type = VEF_RESULT_NULL; return; }
-    auto ta = extract_trigrams(std::string_view(a->str_value, a->str_len));
-    auto tb = extract_trigrams(std::string_view(b->str_value, b->str_len));
-    result->real_value = calc_similarity(ta, tb);
-    result->type = VEF_RESULT_VALUE;
+    if (a.is_null() || b.is_null()) { result.set_null(); return; }
+    auto ta = extract_trigrams(a.value());
+    auto tb = extract_trigrams(b.value());
+    result.set(calc_similarity(ta, tb));
   } catch (...) {
-    result->type = VEF_RESULT_ERROR;
-    snprintf(result->error_msg, VEF_MAX_ERROR_LEN, "trgm_similarity: internal error");
+    result.warning("trgm_similarity: internal error");
   }
 }
 
@@ -209,17 +201,14 @@ void trgm_similarity_impl(vef_context_t* ctx, vef_invalue_t* a, vef_invalue_t* b
 // trgm_distance(text, text) -> REAL   (1 - similarity)
 // =============================================================================
 
-void trgm_distance_impl(vef_context_t* ctx, vef_invalue_t* a, vef_invalue_t* b,
-                        vef_vdf_result_t* result) {
+void trgm_distance_impl(StringArg a, StringArg b, RealResult result) {
   try {
-    if (a->is_null || b->is_null) { result->type = VEF_RESULT_NULL; return; }
-    auto ta = extract_trigrams(std::string_view(a->str_value, a->str_len));
-    auto tb = extract_trigrams(std::string_view(b->str_value, b->str_len));
-    result->real_value = 1.0 - calc_similarity(ta, tb);
-    result->type = VEF_RESULT_VALUE;
+    if (a.is_null() || b.is_null()) { result.set_null(); return; }
+    auto ta = extract_trigrams(a.value());
+    auto tb = extract_trigrams(b.value());
+    result.set(1.0 - calc_similarity(ta, tb));
   } catch (...) {
-    result->type = VEF_RESULT_ERROR;
-    snprintf(result->error_msg, VEF_MAX_ERROR_LEN, "trgm_distance: internal error");
+    result.warning("trgm_distance: internal error");
   }
 }
 
@@ -227,17 +216,14 @@ void trgm_distance_impl(vef_context_t* ctx, vef_invalue_t* a, vef_invalue_t* b,
 // trgm_similar(text, text) -> INT  (1 if similarity >= 0.3, else 0)
 // =============================================================================
 
-void trgm_similar_impl(vef_context_t* ctx, vef_invalue_t* a, vef_invalue_t* b,
-                       vef_vdf_result_t* result) {
+void trgm_similar_impl(StringArg a, StringArg b, IntResult result) {
   try {
-    if (a->is_null || b->is_null) { result->type = VEF_RESULT_NULL; return; }
-    auto ta = extract_trigrams(std::string_view(a->str_value, a->str_len));
-    auto tb = extract_trigrams(std::string_view(b->str_value, b->str_len));
-    result->int_value = calc_similarity(ta, tb) >= 0.3 ? 1 : 0;
-    result->type = VEF_RESULT_VALUE;
+    if (a.is_null() || b.is_null()) { result.set_null(); return; }
+    auto ta = extract_trigrams(a.value());
+    auto tb = extract_trigrams(b.value());
+    result.set(calc_similarity(ta, tb) >= 0.3 ? 1 : 0);
   } catch (...) {
-    result->type = VEF_RESULT_ERROR;
-    snprintf(result->error_msg, VEF_MAX_ERROR_LEN, "trgm_similar: internal error");
+    result.warning("trgm_similar: internal error");
   }
 }
 
@@ -245,27 +231,21 @@ void trgm_similar_impl(vef_context_t* ctx, vef_invalue_t* a, vef_invalue_t* b,
 // trgm_similar_threshold(text, text, real) -> INT
 // =============================================================================
 
-void trgm_similar_threshold_impl(vef_context_t* ctx, vef_invalue_t* a,
-                                  vef_invalue_t* b, vef_invalue_t* threshold,
-                                  vef_vdf_result_t* result) {
+void trgm_similar_threshold_impl(StringArg a, StringArg b, RealArg threshold,
+                                  IntResult result) {
   try {
-    if (a->is_null || b->is_null || threshold->is_null) {
-      result->type = VEF_RESULT_NULL; return;
+    if (a.is_null() || b.is_null() || threshold.is_null()) {
+      result.set_null(); return;
     }
-    if (threshold->real_value < 0.0 || threshold->real_value > 1.0) {
-      result->type = VEF_RESULT_ERROR;
-      snprintf(result->error_msg, VEF_MAX_ERROR_LEN,
-               "trgm_similar_threshold: threshold must be between 0 and 1");
+    if (threshold.value() < 0.0 || threshold.value() > 1.0) {
+      result.warning("trgm_similar_threshold: threshold must be between 0 and 1");
       return;
     }
-    auto ta = extract_trigrams(std::string_view(a->str_value, a->str_len));
-    auto tb = extract_trigrams(std::string_view(b->str_value, b->str_len));
-    result->int_value = calc_similarity(ta, tb) >= threshold->real_value ? 1 : 0;
-    result->type = VEF_RESULT_VALUE;
+    auto ta = extract_trigrams(a.value());
+    auto tb = extract_trigrams(b.value());
+    result.set(calc_similarity(ta, tb) >= threshold.value() ? 1 : 0);
   } catch (...) {
-    result->type = VEF_RESULT_ERROR;
-    snprintf(result->error_msg, VEF_MAX_ERROR_LEN,
-             "trgm_similar_threshold: internal error");
+    result.warning("trgm_similar_threshold: internal error");
   }
 }
 
@@ -273,18 +253,14 @@ void trgm_similar_threshold_impl(vef_context_t* ctx, vef_invalue_t* a,
 // trgm_word_similarity(text, text) -> REAL
 // =============================================================================
 
-void trgm_word_similarity_impl(vef_context_t* ctx, vef_invalue_t* a, vef_invalue_t* b,
-                                vef_vdf_result_t* result) {
+void trgm_word_similarity_impl(StringArg a, StringArg b, RealResult result) {
   try {
-    if (a->is_null || b->is_null) { result->type = VEF_RESULT_NULL; return; }
-    auto t1 = extract_trigrams(std::string_view(a->str_value, a->str_len));
-    auto seq2 = extract_ordered_trigrams(std::string_view(b->str_value, b->str_len));
-    result->real_value = word_sim(t1, seq2);
-    result->type = VEF_RESULT_VALUE;
+    if (a.is_null() || b.is_null()) { result.set_null(); return; }
+    auto t1 = extract_trigrams(a.value());
+    auto seq2 = extract_ordered_trigrams(b.value());
+    result.set(word_sim(t1, seq2));
   } catch (...) {
-    result->type = VEF_RESULT_ERROR;
-    snprintf(result->error_msg, VEF_MAX_ERROR_LEN,
-             "trgm_word_similarity: internal error");
+    result.warning("trgm_word_similarity: internal error");
   }
 }
 
@@ -292,18 +268,14 @@ void trgm_word_similarity_impl(vef_context_t* ctx, vef_invalue_t* a, vef_invalue
 // trgm_word_distance(text, text) -> REAL
 // =============================================================================
 
-void trgm_word_distance_impl(vef_context_t* ctx, vef_invalue_t* a, vef_invalue_t* b,
-                              vef_vdf_result_t* result) {
+void trgm_word_distance_impl(StringArg a, StringArg b, RealResult result) {
   try {
-    if (a->is_null || b->is_null) { result->type = VEF_RESULT_NULL; return; }
-    auto t1 = extract_trigrams(std::string_view(a->str_value, a->str_len));
-    auto seq2 = extract_ordered_trigrams(std::string_view(b->str_value, b->str_len));
-    result->real_value = 1.0 - word_sim(t1, seq2);
-    result->type = VEF_RESULT_VALUE;
+    if (a.is_null() || b.is_null()) { result.set_null(); return; }
+    auto t1 = extract_trigrams(a.value());
+    auto seq2 = extract_ordered_trigrams(b.value());
+    result.set(1.0 - word_sim(t1, seq2));
   } catch (...) {
-    result->type = VEF_RESULT_ERROR;
-    snprintf(result->error_msg, VEF_MAX_ERROR_LEN,
-             "trgm_word_distance: internal error");
+    result.warning("trgm_word_distance: internal error");
   }
 }
 
@@ -311,20 +283,16 @@ void trgm_word_distance_impl(vef_context_t* ctx, vef_invalue_t* a, vef_invalue_t
 // trgm_strict_word_similarity(text, text) -> REAL
 // =============================================================================
 
-void trgm_strict_word_similarity_impl(vef_context_t* ctx, vef_invalue_t* a,
-                                       vef_invalue_t* b, vef_vdf_result_t* result) {
+void trgm_strict_word_similarity_impl(StringArg a, StringArg b, RealResult result) {
   try {
-    if (a->is_null || b->is_null) { result->type = VEF_RESULT_NULL; return; }
-    std::string_view sv_b(b->str_value, b->str_len);
-    auto t1 = extract_trigrams(std::string_view(a->str_value, a->str_len));
+    if (a.is_null() || b.is_null()) { result.set_null(); return; }
+    auto sv_b = b.value();
+    auto t1 = extract_trigrams(a.value());
     auto seq2 = extract_ordered_trigrams(sv_b);
     auto wb = compute_word_boundaries(sv_b);
-    result->real_value = strict_word_sim(t1, seq2, wb);
-    result->type = VEF_RESULT_VALUE;
+    result.set(strict_word_sim(t1, seq2, wb));
   } catch (...) {
-    result->type = VEF_RESULT_ERROR;
-    snprintf(result->error_msg, VEF_MAX_ERROR_LEN,
-             "trgm_strict_word_similarity: internal error");
+    result.warning("trgm_strict_word_similarity: internal error");
   }
 }
 
@@ -332,20 +300,16 @@ void trgm_strict_word_similarity_impl(vef_context_t* ctx, vef_invalue_t* a,
 // trgm_strict_word_distance(text, text) -> REAL
 // =============================================================================
 
-void trgm_strict_word_distance_impl(vef_context_t* ctx, vef_invalue_t* a,
-                                     vef_invalue_t* b, vef_vdf_result_t* result) {
+void trgm_strict_word_distance_impl(StringArg a, StringArg b, RealResult result) {
   try {
-    if (a->is_null || b->is_null) { result->type = VEF_RESULT_NULL; return; }
-    std::string_view sv_b(b->str_value, b->str_len);
-    auto t1 = extract_trigrams(std::string_view(a->str_value, a->str_len));
+    if (a.is_null() || b.is_null()) { result.set_null(); return; }
+    auto sv_b = b.value();
+    auto t1 = extract_trigrams(a.value());
     auto seq2 = extract_ordered_trigrams(sv_b);
     auto wb = compute_word_boundaries(sv_b);
-    result->real_value = 1.0 - strict_word_sim(t1, seq2, wb);
-    result->type = VEF_RESULT_VALUE;
+    result.set(1.0 - strict_word_sim(t1, seq2, wb));
   } catch (...) {
-    result->type = VEF_RESULT_ERROR;
-    snprintf(result->error_msg, VEF_MAX_ERROR_LEN,
-             "trgm_strict_word_distance: internal error");
+    result.warning("trgm_strict_word_distance: internal error");
   }
 }
 
@@ -353,18 +317,14 @@ void trgm_strict_word_distance_impl(vef_context_t* ctx, vef_invalue_t* a,
 // trgm_word_similar(text, text) -> INT  (1 if word_similarity >= 0.6, else 0)
 // =============================================================================
 
-void trgm_word_similar_impl(vef_context_t* ctx, vef_invalue_t* a, vef_invalue_t* b,
-                             vef_vdf_result_t* result) {
+void trgm_word_similar_impl(StringArg a, StringArg b, IntResult result) {
   try {
-    if (a->is_null || b->is_null) { result->type = VEF_RESULT_NULL; return; }
-    auto t1 = extract_trigrams(std::string_view(a->str_value, a->str_len));
-    auto seq2 = extract_ordered_trigrams(std::string_view(b->str_value, b->str_len));
-    result->int_value = word_sim(t1, seq2) >= 0.6 ? 1 : 0;
-    result->type = VEF_RESULT_VALUE;
+    if (a.is_null() || b.is_null()) { result.set_null(); return; }
+    auto t1 = extract_trigrams(a.value());
+    auto seq2 = extract_ordered_trigrams(b.value());
+    result.set(word_sim(t1, seq2) >= 0.6 ? 1 : 0);
   } catch (...) {
-    result->type = VEF_RESULT_ERROR;
-    snprintf(result->error_msg, VEF_MAX_ERROR_LEN,
-             "trgm_word_similar: internal error");
+    result.warning("trgm_word_similar: internal error");
   }
 }
 
@@ -372,20 +332,16 @@ void trgm_word_similar_impl(vef_context_t* ctx, vef_invalue_t* a, vef_invalue_t*
 // trgm_strict_word_similar(text, text) -> INT
 // =============================================================================
 
-void trgm_strict_word_similar_impl(vef_context_t* ctx, vef_invalue_t* a,
-                                    vef_invalue_t* b, vef_vdf_result_t* result) {
+void trgm_strict_word_similar_impl(StringArg a, StringArg b, IntResult result) {
   try {
-    if (a->is_null || b->is_null) { result->type = VEF_RESULT_NULL; return; }
-    std::string_view sv_b(b->str_value, b->str_len);
-    auto t1 = extract_trigrams(std::string_view(a->str_value, a->str_len));
+    if (a.is_null() || b.is_null()) { result.set_null(); return; }
+    auto sv_b = b.value();
+    auto t1 = extract_trigrams(a.value());
     auto seq2 = extract_ordered_trigrams(sv_b);
     auto wb = compute_word_boundaries(sv_b);
-    result->int_value = strict_word_sim(t1, seq2, wb) >= 0.5 ? 1 : 0;
-    result->type = VEF_RESULT_VALUE;
+    result.set(strict_word_sim(t1, seq2, wb) >= 0.5 ? 1 : 0);
   } catch (...) {
-    result->type = VEF_RESULT_ERROR;
-    snprintf(result->error_msg, VEF_MAX_ERROR_LEN,
-             "trgm_strict_word_similar: internal error");
+    result.warning("trgm_strict_word_similar: internal error");
   }
 }
 
@@ -394,7 +350,7 @@ void trgm_strict_word_similar_impl(vef_context_t* ctx, vef_invalue_t* a,
 // =============================================================================
 
 VEF_GENERATE_ENTRY_POINTS(
-  make_extension("vsql_trgm", "1.0.0")
+  make_extension()
     .func(make_func<&trgm_show_impl>("trgm_show")
       .returns(STRING).param(STRING).buffer_size(4096).build())
     .func(make_func<&trgm_similarity_impl>("trgm_similarity")

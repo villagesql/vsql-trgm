@@ -154,7 +154,7 @@ PostgreSQL's `show_trgm(text)` returns `text[]`. VEF VDFs return a single scalar
 
 ## Reporting Bugs and Requesting Features
 
-Open an issue at [github.com/villagesql/villagesql-server/issues](https://github.com/villagesql/villagesql-server/issues). Include:
+Open an issue at [github.com/villagesql/vsql-trgm/issues](https://github.com/villagesql/vsql-trgm/issues). Include:
 - Title and description of the problem
 - Steps to reproduce (SQL statements, inputs, expected vs. actual output)
 - VillageSQL version (`SHOW VARIABLES LIKE 'villagesql_server_version'`)
@@ -162,8 +162,8 @@ Open an issue at [github.com/villagesql/villagesql-server/issues](https://github
 ## Contact
 
 - [Discord](https://discord.gg/KSr6whd3Fr)
-- [GitHub Issues](https://github.com/villagesql/villagesql-server/issues)
-- [GitHub Discussions](https://github.com/villagesql/villagesql-server/discussions)
+- [GitHub Issues](https://github.com/villagesql/vsql-trgm/issues)
+- [GitHub Discussions](https://github.com/villagesql/vsql-trgm/discussions)
 
 ## License
 

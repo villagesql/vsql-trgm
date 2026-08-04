@@ -49,6 +49,20 @@ ORDER BY vsql_trgm.trgm_similarity(name, 'adidas') DESC;
 
 All functions return `NULL` if any argument is `NULL`.
 
+All functions are deterministic and can be used in generated columns and CHECK
+constraints:
+
+```sql
+CREATE TABLE products (
+  name         VARCHAR(255) NOT NULL,
+  adidas_score REAL AS (trgm_similarity(name, 'adidas')) STORED,
+  CHECK (trgm_similar_threshold(name, 'adidas', 0.1) IN (0, 1))
+);
+INSERT INTO products (name) VALUES ('adidas originals');
+SELECT name, adidas_score FROM products;
+-- adidas originals | 0.4117647058823529
+```
+
 ## Prerequisites
 
 - VillageSQL build directory

@@ -34,7 +34,7 @@ ORDER BY vsql_trgm.trgm_similarity(name, 'adidas') DESC;
 | `trgm_similarity(text, text)` | `similarity(text, text)` | `\|A ∩ B\| / max(\|A\|, \|B\|)` similarity (0–1) |
 | `trgm_distance(text, text)` | `text <-> text` | 1 − similarity |
 | `trgm_similar(text, text)` | `text % text` | 1 if similarity ≥ 0.3, else 0 |
-| `trgm_similar_threshold(text, text, real)` | `text % text` with custom limit | 1 if similarity ≥ threshold, else 0 |
+| `trgm_similar_threshold(text, text, real)` | `text % text` with custom limit | 1 if similarity ≥ threshold, else 0. `threshold` must be between 0 and 1; out of range returns NULL with a warning |
 
 ### Word Similarity
 
@@ -71,6 +71,20 @@ SELECT name, adidas_score FROM products;
 
 📚 **Full Documentation**: [villagesql.com/docs](https://villagesql.com/docs)
 
+## Installation
+
+If you installed VillageSQL with the install script, the Docker image, or a
+release tarball, `vsql_trgm.veb` is already in the server's `lib/veb/`
+directory — this extension is bundled with the server. There is nothing to build
+or download:
+
+```sql
+INSTALL EXTENSION vsql_trgm;
+```
+
+Build from source only if you built the server from source without the bundled
+extensions, or if you are working on this extension itself.
+
 ## Building
 
 Using the included `build.sh`:
@@ -93,7 +107,7 @@ make -j$(nproc)
 **macOS:**
 ```bash
 mkdir build && cd build
-cmake .. -DVillageSQL_BUILD_DIR=~/build/villagesql
+cmake .. -DVillageSQL_BUILD_DIR="$HOME/build/villagesql"
 make -j$(sysctl -n hw.logicalcpu)
 ```
 

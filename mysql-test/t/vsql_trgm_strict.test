@@ -11,6 +11,12 @@ SELECT vsql_trgm.trgm_strict_word_similarity('abc', 'xyz abc def');
 SELECT vsql_trgm.trgm_strict_word_similarity('hello', 'hello world');
 
 --echo #
+--echo # trgm_strict_word_similarity — partial match; pg_trgm returns 0.333333 and 0.3
+--echo #
+SELECT vsql_trgm.trgm_strict_word_similarity('cat', 'a car');
+SELECT vsql_trgm.trgm_strict_word_similarity('jonathan', 'jon smith');
+
+--echo #
 --echo # trgm_strict_word_similarity — NULL handling
 --echo #
 SELECT vsql_trgm.trgm_strict_word_similarity(NULL, 'hello world');

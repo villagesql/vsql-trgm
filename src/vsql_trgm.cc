@@ -16,7 +16,6 @@
 
 #include <villagesql/vsql.h>
 
-#include <algorithm>
 #include <cctype>
 #include <cstring>
 #include <set>
@@ -69,7 +68,11 @@ static std::vector<std::string> extract_ordered_trigrams(std::string_view input)
   return result;
 }
 
-// |A ∩ B| / max(|A|, |B|) — matches pg_trgm's default CALCSML formula.
+// |A ∩ B| / |A ∪ B| — pg_trgm's CALCSML formula (trgm.h defines DIVUNION).
+static double sml(size_t shared, size_t len1, size_t len2) {
+  return static_cast<double>(shared) / (len1 + len2 - shared);
+}
+
 static double calc_similarity(const std::set<std::string>& a,
                                const std::set<std::string>& b) {
   if (a.empty() && b.empty()) return 0.0;
@@ -77,11 +80,11 @@ static double calc_similarity(const std::set<std::string>& a,
   for (const auto& t : a) {
     if (b.count(t)) ++shared;
   }
-  return static_cast<double>(shared) / std::max(a.size(), b.size());
+  return sml(shared, a.size(), b.size());
 }
 
 // word_similarity: max over all contiguous windows of seq2 of
-//   |t1 ∩ window| / max(|t1|, |window|)
+//   |t1 ∩ window| / |t1 ∪ window|
 // Window grows monotonically left-to-right from each start position i;
 // matched is maintained incrementally to avoid recounting per step.
 static double word_sim(const std::set<std::string>& t1,
@@ -94,7 +97,7 @@ static double word_sim(const std::set<std::string>& t1,
     size_t matched = 0;
     for (size_t j = i; j < n; ++j) {
       if (window.insert(seq2[j]).second && t1.count(seq2[j])) ++matched;
-      double sim = static_cast<double>(matched) / std::max(t1.size(), window.size());
+      double sim = sml(matched, t1.size(), window.size());
       if (sim > best) best = sim;
     }
   }
@@ -142,7 +145,7 @@ static double strict_word_sim(const std::set<std::string>& t1,
     for (size_t j = i; j < n; ++j) {
       if (window.insert(seq2[j]).second && t1.count(seq2[j])) ++matched;
       if (!wb.is_word_end[j]) continue;
-      double sim = static_cast<double>(matched) / std::max(t1.size(), window.size());
+      double sim = sml(matched, t1.size(), window.size());
       if (sim > best) best = sim;
     }
   }

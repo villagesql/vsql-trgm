@@ -20,17 +20,21 @@ SELECT vsql_trgm.trgm_similarity('abc', 'xyz');
 SELECT vsql_trgm.trgm_similarity('', '');
 
 --echo #
---echo # trgm_similarity — equal-length: 'cat' vs 'bat' = 0.25
+--echo # trgm_similarity — shared / union, as in pg_trgm
 --echo # cat: {  c, ca, cat, at } = 4 trigrams
 --echo # bat: {  b, ba, bat, at } = 4 trigrams; shared: {at } = 1
---echo # score = 1 / max(4,4) = 0.25
+--echo # score = 1 / (4 + 4 - 1) = 0.142857
 --echo #
 SELECT vsql_trgm.trgm_similarity('cat', 'bat');
+--echo # cat vs car: shared {  c, ca} = 2; score = 2 / (4 + 4 - 2) = 0.333333
+SELECT vsql_trgm.trgm_similarity('cat', 'car');
+--echo # pg_trgm returns 0.5625
+SELECT vsql_trgm.trgm_similarity('Jonathan Smith', 'Jon Smith');
 
 --echo #
---echo # trgm_similarity — unequal-length: 'cat' vs 'catalog' = 0.375
+--echo # trgm_similarity — unequal-length: 'cat' vs 'catalog'
 --echo # cat: 4 trigrams; catalog: 8 trigrams; shared: {  c,  ca, cat} = 3
---echo # score = 3 / max(4,8) = 0.375
+--echo # score = 3 / (4 + 8 - 3) = 0.333333
 --echo #
 SELECT vsql_trgm.trgm_similarity('cat', 'catalog');
 

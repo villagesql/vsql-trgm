@@ -39,7 +39,7 @@ The build:
 **Core Components:**
 - `src/vsql_trgm.cc` — all trigram logic and VDF registration in one file
 - `cmake/FindVillageSQL.cmake` — SDK discovery module
-- `manifest.json` — extension metadata (`vsql_trgm`, version `0.0.2`)
+- `manifest.json` — extension metadata (`vsql_trgm`, version `0.0.4`)
 - `mysql-test/t/` — MTR test files
 - `mysql-test/r/` — expected MTR results
 
@@ -47,7 +47,7 @@ The build:
 
 *Similarity (whole-string):*
 - `trgm_show(text)` — returns sorted JSON array of trigrams for the input
-- `trgm_similarity(text, text)` — similarity score 0–1 (`|A ∩ B| / max(|A|, |B|)`)
+- `trgm_similarity(text, text)` — similarity score 0–1 (`|A ∩ B| / |A ∪ B|`)
 - `trgm_distance(text, text)` — 1 − similarity
 - `trgm_similar(text, text)` — 1 if similarity ≥ 0.3, else 0
 - `trgm_similar_threshold(text, text, real)` — 1 if similarity ≥ threshold, else 0

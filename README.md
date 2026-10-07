@@ -13,7 +13,7 @@ Computes similarity between text strings using the trigram model. A trigram is a
 INSTALL EXTENSION vsql_trgm;
 
 -- Similarity score (0–1)
-SELECT vsql_trgm.trgm_similarity('cat', 'car');      -- 0.5
+SELECT vsql_trgm.trgm_similarity('cat', 'car');      -- 0.3333333333333333
 
 -- Is above the default 0.3 threshold?
 SELECT vsql_trgm.trgm_similar('cat', 'car');         -- 1
@@ -31,7 +31,7 @@ ORDER BY vsql_trgm.trgm_similarity(name, 'adidas') DESC;
 | Function | PostgreSQL equivalent | Description |
 |---|---|---|
 | `trgm_show(text)` | `show_trgm(text)` | Returns sorted JSON array of trigrams |
-| `trgm_similarity(text, text)` | `similarity(text, text)` | `\|A ∩ B\| / max(\|A\|, \|B\|)` similarity (0–1) |
+| `trgm_similarity(text, text)` | `similarity(text, text)` | `\|A ∩ B\| / \|A ∪ B\|` similarity (0–1) |
 | `trgm_distance(text, text)` | `text <-> text` | 1 − similarity |
 | `trgm_similar(text, text)` | `text % text` | 1 if similarity ≥ 0.3, else 0 |
 | `trgm_similar_threshold(text, text, real)` | `text % text` with custom limit | 1 if similarity ≥ threshold, else 0. `threshold` must be between 0 and 1; out of range returns NULL with a warning |

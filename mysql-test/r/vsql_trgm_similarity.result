@@ -34,22 +34,30 @@ SELECT vsql_trgm.trgm_similarity('', '');
 vsql_trgm.trgm_similarity('', '')
 0
 #
-# trgm_similarity — equal-length: 'cat' vs 'bat' = 0.25
+# trgm_similarity — shared / union, as in pg_trgm
 # cat: {  c, ca, cat, at } = 4 trigrams
 # bat: {  b, ba, bat, at } = 4 trigrams; shared: {at } = 1
-# score = 1 / max(4,4) = 0.25
+# score = 1 / (4 + 4 - 1) = 0.142857
 #
 SELECT vsql_trgm.trgm_similarity('cat', 'bat');
 vsql_trgm.trgm_similarity('cat', 'bat')
-0.25
+0.14285714285714285
+# cat vs car: shared {  c, ca} = 2; score = 2 / (4 + 4 - 2) = 0.333333
+SELECT vsql_trgm.trgm_similarity('cat', 'car');
+vsql_trgm.trgm_similarity('cat', 'car')
+0.3333333333333333
+# pg_trgm returns 0.5625
+SELECT vsql_trgm.trgm_similarity('Jonathan Smith', 'Jon Smith');
+vsql_trgm.trgm_similarity('Jonathan Smith', 'Jon Smith')
+0.5625
 #
-# trgm_similarity — unequal-length: 'cat' vs 'catalog' = 0.375
+# trgm_similarity — unequal-length: 'cat' vs 'catalog'
 # cat: 4 trigrams; catalog: 8 trigrams; shared: {  c,  ca, cat} = 3
-# score = 3 / max(4,8) = 0.375
+# score = 3 / (4 + 8 - 3) = 0.333333
 #
 SELECT vsql_trgm.trgm_similarity('cat', 'catalog');
 vsql_trgm.trgm_similarity('cat', 'catalog')
-0.375
+0.3333333333333333
 #
 # trgm_similarity — symmetry
 #
@@ -85,7 +93,7 @@ vsql_trgm.trgm_distance('abc', 'xyz')
 1
 SELECT vsql_trgm.trgm_distance('cat', 'bat');
 vsql_trgm.trgm_distance('cat', 'bat')
-0.75
+0.8571428571428572
 SELECT vsql_trgm.trgm_distance(NULL, 'abc');
 vsql_trgm.trgm_distance(NULL, 'abc')
 NULL

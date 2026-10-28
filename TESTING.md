@@ -59,7 +59,7 @@ Inspect the diff before committing — `--record` overwrites `.result` files unc
 
 | File | What it covers |
 |---|---|
-| `t/vsql_trgm_similarity.test` | `trgm_show`, `trgm_similarity`, `trgm_distance` — trigram extraction, Dice coefficient, NULL handling, case-insensitivity, edge cases |
+| `t/vsql_trgm_similarity.test` | `trgm_show`, `trgm_similarity`, `trgm_distance` — trigram extraction, Dice coefficient, NULL handling, case-insensitivity, edge cases, result-buffer growth on long output |
 | `t/vsql_trgm_threshold.test` | `trgm_similar`, `trgm_similar_threshold` — default and explicit threshold, out-of-range threshold error behavior |
 | `t/vsql_trgm_word.test` | `trgm_word_similarity`, `trgm_word_distance`, `trgm_word_similar` — word-level similarity, NULL handling |
 | `t/vsql_trgm_strict.test` | `trgm_strict_word_similarity`, `trgm_strict_word_distance`, `trgm_strict_word_similar` — word-boundary-aligned similarity |

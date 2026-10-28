@@ -175,7 +175,12 @@ void trgm_show_impl(StringArg arg, StringResult result) {
 
     auto buf = result.buffer();
     if (out.size() > buf.size()) {
-      result.warning("trgm_show: output too large");
+      // Report the true (unclamped) length so the server's dispatcher grows
+      // the buffer and retries once with enough room; only copy the prefix
+      // that fits this time, since the server does not read it on the
+      // overflowing attempt.
+      memcpy(buf.data(), out.data(), buf.size());
+      result.set_length(out.size());
       return;
     }
     memcpy(buf.data(), out.data(), out.size());

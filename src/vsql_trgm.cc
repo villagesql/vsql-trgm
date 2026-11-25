@@ -16,12 +16,15 @@
 
 #include <villagesql/vsql.h>
 
-#include <cctype>
+#include <algorithm>
 #include <cstring>
+#include <iterator>
 #include <set>
 #include <string>
 #include <string_view>
 #include <vector>
+
+#include "unicode_tables.h"
 
 using namespace vsql;
 
@@ -29,42 +32,120 @@ using namespace vsql;
 // Core trigram algorithm
 // =============================================================================
 
-// Lowercases input, splits on non-alphanumeric characters, pads each word with
-// two leading spaces and one trailing space, then calls on_word for each padded
-// word. Shared tokenization path for all three extraction functions below.
+// Length in bytes of the well-formed UTF-8 character at s[i], or 0 when the
+// bytes there are not one (bad lead byte, missing or bad continuation byte,
+// overlong form, surrogate, or above U+10FFFF). Never reads past s.size().
+static size_t utf8_char_len(std::string_view s, size_t i, char32_t* cp) {
+  auto b = [&](size_t k) { return static_cast<unsigned char>(s[i + k]); };
+  unsigned char c = b(0);
+  size_t len;
+  char32_t v, min;
+  if (c < 0x80) { *cp = c; return 1; }
+  if (c >= 0xC2 && c <= 0xDF) { len = 2; v = c & 0x1F; min = 0x80; }
+  else if (c >= 0xE0 && c <= 0xEF) { len = 3; v = c & 0x0F; min = 0x800; }
+  else if (c >= 0xF0 && c <= 0xF4) { len = 4; v = c & 0x07; min = 0x10000; }
+  else return 0;
+  if (s.size() - i < len) return 0;
+  for (size_t k = 1; k < len; ++k) {
+    if ((b(k) & 0xC0) != 0x80) return 0;
+    v = (v << 6) | (b(k) & 0x3F);
+  }
+  if (v < min || v > 0x10FFFF || (v >= 0xD800 && v <= 0xDFFF)) return 0;
+  *cp = v;
+  return len;
+}
+
+// A word character is a letter (general category L*), a combining mark (Mn,
+// Mc) other than a variation selector, or a decimal digit (Nd). Marks keep
+// Thai, Devanagari and decomposed (NFD) words whole.
+static bool is_word_char(char32_t cp) {
+  auto it = std::upper_bound(
+      std::begin(kWordRanges), std::end(kWordRanges), cp,
+      [](char32_t c, const CpRange& r) { return c < r.lo; });
+  return it != std::begin(kWordRanges) && cp <= std::prev(it)->hi;
+}
+
+// Simple (one-to-one) Unicode lowercase mapping.
+static char32_t to_lower(char32_t cp) {
+  auto it = std::upper_bound(
+      std::begin(kLowerRuns), std::end(kLowerRuns), cp,
+      [](char32_t c, const LowerRun& r) { return c < r.lo; });
+  if (it == std::begin(kLowerRuns)) return cp;
+  const LowerRun& r = *std::prev(it);
+  if (cp > r.hi || (cp - r.lo) % r.stride != 0) return cp;
+  return static_cast<char32_t>(static_cast<int32_t>(cp) + r.delta);
+}
+
+static void append_utf8(std::string& out, char32_t cp) {
+  if (cp < 0x80) {
+    out += static_cast<char>(cp);
+  } else if (cp < 0x800) {
+    out += static_cast<char>(0xC0 | (cp >> 6));
+    out += static_cast<char>(0x80 | (cp & 0x3F));
+  } else if (cp < 0x10000) {
+    out += static_cast<char>(0xE0 | (cp >> 12));
+    out += static_cast<char>(0x80 | ((cp >> 6) & 0x3F));
+    out += static_cast<char>(0x80 | (cp & 0x3F));
+  } else {
+    out += static_cast<char>(0xF0 | (cp >> 18));
+    out += static_cast<char>(0x80 | ((cp >> 12) & 0x3F));
+    out += static_cast<char>(0x80 | ((cp >> 6) & 0x3F));
+    out += static_cast<char>(0x80 | (cp & 0x3F));
+  }
+}
+
+// Splits UTF-8 input into words of word characters, lowercasing each one,
+// pads each word with two leading spaces and one trailing space, then calls
+// on_word with the padded word as a list of characters (each one a UTF-8
+// string). Bytes that are not well-formed UTF-8 act as separators. Shared
+// tokenization path for all three extraction functions below.
 template <typename F>
 static void for_each_word(std::string_view input, F on_word) {
-  std::string word;
-  word.reserve(64);
+  std::vector<std::string> word;
   auto flush = [&]() {
     if (word.empty()) return;
-    on_word("  " + word + " ");
+    word.insert(word.begin(), 2, " ");
+    word.push_back(" ");
+    on_word(word);
     word.clear();
   };
-  for (unsigned char c : input) {
-    if (std::isalnum(c)) word += static_cast<char>(std::tolower(c));
-    else flush();
+  for (size_t i = 0; i < input.size();) {
+    char32_t cp = 0;
+    size_t len = utf8_char_len(input, i, &cp);
+    if (len == 0) { flush(); ++i; continue; }
+    if (is_word_char(cp)) {
+      std::string ch;
+      append_utf8(ch, to_lower(cp));
+      word.push_back(std::move(ch));
+    } else {
+      flush();
+    }
+    i += len;
   }
   flush();
+}
+
+// Calls on_trigram for each run of three consecutive characters in each padded
+// word, in order.
+template <typename F>
+static void for_each_trigram(std::string_view input, F on_trigram) {
+  for_each_word(input, [&](const std::vector<std::string>& padded) {
+    for (size_t i = 0; i + 2 < padded.size(); ++i)
+      on_trigram(padded[i] + padded[i + 1] + padded[i + 2]);
+  });
 }
 
 // Sorted, deduplicated trigram set.
 static std::set<std::string> extract_trigrams(std::string_view input) {
   std::set<std::string> result;
-  for_each_word(input, [&](const std::string& padded) {
-    for (size_t i = 0; i + 2 < padded.size(); ++i)
-      result.insert(padded.substr(i, 3));
-  });
+  for_each_trigram(input, [&](std::string t) { result.insert(std::move(t)); });
   return result;
 }
 
 // Ordered trigram sequence (preserves word order and inter-word duplicates).
 static std::vector<std::string> extract_ordered_trigrams(std::string_view input) {
   std::vector<std::string> result;
-  for_each_word(input, [&](const std::string& padded) {
-    for (size_t i = 0; i + 2 < padded.size(); ++i)
-      result.push_back(padded.substr(i, 3));
-  });
+  for_each_trigram(input, [&](std::string t) { result.push_back(std::move(t)); });
   return result;
 }
 
@@ -113,7 +194,7 @@ struct WordBoundaries {
 static WordBoundaries compute_word_boundaries(std::string_view input) {
   std::vector<std::pair<size_t, size_t>> word_ranges;
   size_t idx = 0;
-  for_each_word(input, [&](const std::string& padded) {
+  for_each_word(input, [&](const std::vector<std::string>& padded) {
     size_t count = padded.size() >= 3 ? padded.size() - 2 : 0;
     if (count > 0) {
       word_ranges.push_back({idx, idx + count - 1});
@@ -168,7 +249,9 @@ void trgm_show_impl(StringArg arg, StringResult result) {
       if (!first) out += ',';
       first = false;
       out += '"';
-      out += t;  // trigrams contain only [a-z0-9 ]; safe in JSON strings
+      // Trigrams hold only spaces and well-formed UTF-8 word characters
+      // (is_word_char), so no character needs a JSON escape.
+      out += t;
       out += '"';
     }
     out += ']';
@@ -359,8 +442,12 @@ void trgm_strict_word_similar_impl(StringArg a, StringArg b, IntResult result) {
 
 VEF_GENERATE_ENTRY_POINTS(
   make_extension()
+    // max_result_length raises the extension to VEF_PROTOCOL_5, from which the
+    // server passes every STRING argument as utf8mb4. The JSON grows with the
+    // input and has no fixed cap, so declare the server's ceiling.
     .func(make_func<&trgm_show_impl>("trgm_show")
-      .returns(STRING).param(STRING).buffer_size(4096).deterministic().build())
+      .returns(STRING).max_result_length(VEF_MAX_RESULT_LENGTH)
+      .param(STRING).buffer_size(4096).deterministic().build())
     .func(make_func<&trgm_similarity_impl>("trgm_similarity")
       .returns(REAL).param(STRING).param(STRING).deterministic().build())
     .func(make_func<&trgm_distance_impl>("trgm_distance")

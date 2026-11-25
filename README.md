@@ -9,6 +9,10 @@ GitHub repo name (hyphens): `vsql-trgm`
 
 Computes similarity between text strings using the trigram model. A trigram is a group of 3 consecutive characters. Two strings are similar if they share many trigrams.
 
+Words are runs of Unicode letters, combining marks (except variation selectors), and digits, so `'数据库'` and `'José'` produce trigrams of whole characters, and upper case and lower case match (`'ПРИВЕТ'` and `'привет'`). Spaces, punctuation, and symbols separate words.
+
+The server converts each argument to `utf8mb4` before the function runs, so a `latin1` column gives the same trigrams as a `utf8mb4` one. A binary string that is not valid UTF-8 fails with `ERROR 3854 (HY000): Cannot convert string 'ab\xFFcd' from binary to utf8mb4`.
+
 ```sql
 INSTALL EXTENSION vsql_trgm;
 
@@ -65,6 +69,7 @@ SELECT name, adidas_score FROM products;
 
 ## Prerequisites
 
+- VillageSQL 0.0.8 or later
 - VillageSQL build directory
 - CMake 3.16 or higher
 - C++ compiler with C++17 support
@@ -97,18 +102,10 @@ export VillageSQL_BUILD_DIR=/path/to/villagesql/build
 
 Or manually:
 
-**Linux:**
-```bash
-mkdir build && cd build
-cmake .. -DVillageSQL_BUILD_DIR=$HOME/build/villagesql
-make -j$(nproc)
-```
-
-**macOS:**
 ```bash
 mkdir build && cd build
 cmake .. -DVillageSQL_BUILD_DIR="$HOME/build/villagesql"
-make -j$(sysctl -n hw.logicalcpu)
+make -j $(getconf _NPROCESSORS_ONLN)
 ```
 
 ## Installing
@@ -134,15 +131,8 @@ UNINSTALL EXTENSION vsql_trgm;
 
 ### Option 1: Using installed VEB
 
-**Linux:**
 ```bash
 cd $HOME/build/villagesql/mysql-test
-perl mysql-test-run.pl --suite=/path/to/vsql_trgm/mysql-test
-```
-
-**macOS:**
-```bash
-cd ~/build/villagesql/mysql-test
 perl mysql-test-run.pl --suite=/path/to/vsql_trgm/mysql-test
 ```
 
@@ -179,6 +169,10 @@ PostgreSQL's `show_trgm(text)` returns `text[]`. VEF VDFs return a single scalar
 **Workaround:** `trgm_show(text)` returns a sorted JSON array string: `'["  c"," ca","at ","cat"]'`. Parse it with `JSON_TABLE` or application code.
 
 **What VEF would need:** An array return type or table-valued function (set-returning function) API.
+
+### Unicode text
+
+Lowercasing uses the simple one-to-one Unicode mapping, as `pg_trgm` does, so `Σ` becomes `σ` (never the final form `ς`) and `İ` (U+0130) becomes `i`. A `VARBINARY` column with one row that is not valid UTF-8 fails the whole query with `ERROR 3854`, because the server converts each argument to `utf8mb4` first.
 
 ## Reporting Bugs and Requesting Features
 

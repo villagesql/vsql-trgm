@@ -1,0 +1,171 @@
+# vsql_trgm: non-ASCII text is split into words and trigrams by character
+INSTALL EXTENSION vsql_trgm;
+SET NAMES utf8mb4;
+# Protocol 5 or later: the server passes STRING arguments as utf8mb4
+SELECT JSON_EXTRACT(REGISTRATION_JSON, '$.requested_protocol') >= 5 AS protocol_5_or_later
+FROM INFORMATION_SCHEMA.EXTENSION_REGISTRATION WHERE EXTENSION_NAME = 'vsql_trgm';
+protocol_5_or_later
+1
+#
+# Chinese: each character is a word character
+#
+SELECT vsql_trgm.trgm_show('数据库');
+vsql_trgm.trgm_show('数据库')
+["  数"," 数据","据库 ","数据库"]
+SELECT vsql_trgm.trgm_similarity('数据库', '数据库');
+vsql_trgm.trgm_similarity('数据库', '数据库')
+1
+SELECT vsql_trgm.trgm_similarity('数据库', '数据');
+vsql_trgm.trgm_similarity('数据库', '数据')
+0.4
+SELECT vsql_trgm.trgm_word_similarity('数据库', '关系 数据库 系统');
+vsql_trgm.trgm_word_similarity('数据库', '关系 数据库 系统')
+1
+SELECT vsql_trgm.trgm_strict_word_similarity('数据库', '数据库 系统');
+vsql_trgm.trgm_strict_word_similarity('数据库', '数据库 系统')
+1
+#
+# CJK punctuation separates words
+#
+SELECT vsql_trgm.trgm_show('数据，库');
+vsql_trgm.trgm_show('数据，库')
+["  库","  数"," 库 "," 数据","数据 "]
+#
+# Accented Latin: é is a letter, not a separator
+#
+SELECT vsql_trgm.trgm_show('José');
+vsql_trgm.trgm_show('José')
+["  j"," jo","jos","osé","sé "]
+SELECT vsql_trgm.trgm_similarity('José', 'Jose');
+vsql_trgm.trgm_similarity('José', 'Jose')
+0.42857142857142855
+SELECT vsql_trgm.trgm_similarity('José', 'josé');
+vsql_trgm.trgm_similarity('José', 'josé')
+1
+SELECT vsql_trgm.trgm_similarity('JOSÉ', 'josé');
+vsql_trgm.trgm_similarity('JOSÉ', 'josé')
+1
+SELECT vsql_trgm.trgm_similarity('ÀB', 'àb');
+vsql_trgm.trgm_similarity('ÀB', 'àb')
+1
+#
+# Cyrillic case folding
+#
+SELECT vsql_trgm.trgm_show('ПРИВЕТ');
+vsql_trgm.trgm_show('ПРИВЕТ')
+["  п"," пр","вет","ет ","иве","при","рив"]
+SELECT vsql_trgm.trgm_similarity('ПРИВЕТ', 'привет');
+vsql_trgm.trgm_similarity('ПРИВЕТ', 'привет')
+1
+#
+# Symbols separate words; letters such as µ do not
+#
+SELECT vsql_trgm.trgm_show('€100');
+vsql_trgm.trgm_show('€100')
+["  1"," 10","00 ","100"]
+SELECT vsql_trgm.trgm_show('a→b≠c');
+vsql_trgm.trgm_show('a→b≠c')
+["  a","  b","  c"," a "," b "," c "]
+# U+1F600 (grinning face emoji)
+SELECT vsql_trgm.trgm_show(CONCAT('ok', UNHEX('F09F9880'), 'ab'));
+vsql_trgm.trgm_show(CONCAT('ok', UNHEX('F09F9880'), 'ab'))
+["  a","  o"," ab"," ok","ab ","ok "]
+SELECT vsql_trgm.trgm_show('5µm');
+vsql_trgm.trgm_show('5µm')
+["  5"," 5µ","5µm","µm "]
+SELECT vsql_trgm.trgm_similarity(CONCAT(UNHEX('EFBBBF'), 'abc'), 'abc');
+vsql_trgm.trgm_similarity(CONCAT(UNHEX('EFBBBF'), 'abc'), 'abc')
+1
+SELECT vsql_trgm.trgm_word_similarity('José', 'Señor José García');
+vsql_trgm.trgm_word_similarity('José', 'Señor José García')
+1
+#
+# Mixed ASCII and CJK in one word, and as separate words
+#
+SELECT vsql_trgm.trgm_show('SQL数据');
+vsql_trgm.trgm_show('SQL数据')
+["  s"," sq","l数据","ql数","sql","数据 "]
+SELECT vsql_trgm.trgm_show('SQL 数据');
+vsql_trgm.trgm_show('SQL 数据')
+["  s","  数"," sq"," 数据","ql ","sql","数据 "]
+SELECT vsql_trgm.trgm_similarity('MySQL数据库', 'mysql数据库');
+vsql_trgm.trgm_similarity('MySQL数据库', 'mysql数据库')
+1
+SELECT vsql_trgm.trgm_strict_word_similarity('数据', 'SQL 数据 库');
+vsql_trgm.trgm_strict_word_similarity('数据', 'SQL 数据 库')
+1
+#
+# Combining marks are word characters: Thai, Hindi and NFD José stay whole
+#
+SELECT vsql_trgm.trgm_show('สวัสดี');
+vsql_trgm.trgm_show('สวัสดี')
+["  ส"," สว","ดี ","วัส","สดี","สวั","ัสด"]
+SELECT vsql_trgm.trgm_show('हिन्दी');
+vsql_trgm.trgm_show('हिन्दी')
+["  ह"," हि","दी ","न्द","हिन","िन्","्दी"]
+SELECT vsql_trgm.trgm_show(CONVERT(X'4A6F7365CC81' USING utf8mb4));
+vsql_trgm.trgm_show(CONVERT(X'4A6F7365CC81' USING utf8mb4))
+["  j"," jo","é ","jos","ose","sé"]
+#
+# Variation selectors and enclosing marks separate words
+#
+SELECT vsql_trgm.trgm_show('❤️') AS heart_vs16;
+heart_vs16
+[]
+SELECT vsql_trgm.trgm_similarity('❤️', '☀️') AS heart_sun_vs16;
+heart_sun_vs16
+0
+SELECT vsql_trgm.trgm_show('1️⃣') AS keycap_one;
+keycap_one
+["  1"," 1 "]
+#
+# 4-byte characters: U+10400 lowercases to U+10428; U+20000 is a CJK ideograph
+#
+SELECT vsql_trgm.trgm_show('𐐀𐐁') AS show_deseret;
+show_deseret
+["  𐐨"," 𐐨𐐩","𐐨𐐩 "]
+SELECT vsql_trgm.trgm_similarity('𐐀𐐁', '𐐨𐐩') AS sim_deseret;
+sim_deseret
+1
+SELECT vsql_trgm.trgm_show('𠀀𠀁') AS show_ext_b;
+show_ext_b
+["  𠀀"," 𠀀𠀁","𠀀𠀁 "]
+#
+# Case pairs at stride 2 (Latin Extended-A)
+#
+SELECT vsql_trgm.trgm_show('ĀĂĄ');
+vsql_trgm.trgm_show('ĀĂĄ')
+["  ā"," āă","āăą","ăą "]
+SELECT vsql_trgm.trgm_similarity('ĀĂĄ', 'āăą');
+vsql_trgm.trgm_similarity('ĀĂĄ', 'āăą')
+1
+#
+# Simple lowercase: Σ becomes σ, not final ς; İ (U+0130) becomes i
+#
+SELECT vsql_trgm.trgm_show('ΟΔΟΣ');
+vsql_trgm.trgm_show('ΟΔΟΣ')
+["  ο"," οδ","δοσ","οδο","οσ "]
+SELECT vsql_trgm.trgm_show('İx');
+vsql_trgm.trgm_show('İx')
+["  i"," ix","ix "]
+#
+# Malformed UTF-8: the server rejects the argument before the function runs
+#
+SELECT vsql_trgm.trgm_show(UNHEX('6162FF6364'));
+ERROR HY000: Cannot convert string 'ab\xFFcd' from binary to utf8mb4
+SELECT vsql_trgm.trgm_show(UNHEX('6162E6'));
+ERROR HY000: Cannot convert string 'ab\xE6' from binary to utf8mb4
+SELECT vsql_trgm.trgm_show(UNHEX('C0AF6162'));
+ERROR HY000: Cannot convert string '\xC0\xAFab' from binary to utf8mb4
+SELECT vsql_trgm.trgm_similarity(UNHEX('E695B0E68DAEE5BA'), '数据');
+ERROR HY000: Cannot convert string '\xE6\x95\xB0\xE6\x8D\xAE...' from binary to utf8mb4
+#
+# The server converts a latin1 column to utf8mb4 before the call
+#
+CREATE TABLE t_latin1 (c VARCHAR(10) CHARACTER SET latin1);
+INSERT INTO t_latin1 VALUES ('José');
+SELECT vsql_trgm.trgm_show(c), vsql_trgm.trgm_show(CONVERT(c USING utf8mb4)) FROM t_latin1;
+vsql_trgm.trgm_show(c)	vsql_trgm.trgm_show(CONVERT(c USING utf8mb4))
+["  j"," jo","jos","osé","sé "]	["  j"," jo","jos","osé","sé "]
+DROP TABLE t_latin1;
+UNINSTALL EXTENSION vsql_trgm;

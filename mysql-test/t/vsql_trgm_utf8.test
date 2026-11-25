@@ -1,0 +1,111 @@
+--echo # vsql_trgm: non-ASCII text is split into words and trigrams by character
+
+INSTALL EXTENSION vsql_trgm;
+SET NAMES utf8mb4;
+
+--echo # Protocol 5 or later: the server passes STRING arguments as utf8mb4
+SELECT JSON_EXTRACT(REGISTRATION_JSON, '$.requested_protocol') >= 5 AS protocol_5_or_later
+FROM INFORMATION_SCHEMA.EXTENSION_REGISTRATION WHERE EXTENSION_NAME = 'vsql_trgm';
+
+--echo #
+--echo # Chinese: each character is a word character
+--echo #
+SELECT vsql_trgm.trgm_show('数据库');
+SELECT vsql_trgm.trgm_similarity('数据库', '数据库');
+SELECT vsql_trgm.trgm_similarity('数据库', '数据');
+SELECT vsql_trgm.trgm_word_similarity('数据库', '关系 数据库 系统');
+SELECT vsql_trgm.trgm_strict_word_similarity('数据库', '数据库 系统');
+
+--echo #
+--echo # CJK punctuation separates words
+--echo #
+SELECT vsql_trgm.trgm_show('数据，库');
+
+--echo #
+--echo # Accented Latin: é is a letter, not a separator
+--echo #
+SELECT vsql_trgm.trgm_show('José');
+SELECT vsql_trgm.trgm_similarity('José', 'Jose');
+SELECT vsql_trgm.trgm_similarity('José', 'josé');
+SELECT vsql_trgm.trgm_similarity('JOSÉ', 'josé');
+SELECT vsql_trgm.trgm_similarity('ÀB', 'àb');
+
+--echo #
+--echo # Cyrillic case folding
+--echo #
+SELECT vsql_trgm.trgm_show('ПРИВЕТ');
+SELECT vsql_trgm.trgm_similarity('ПРИВЕТ', 'привет');
+
+--echo #
+--echo # Symbols separate words; letters such as µ do not
+--echo #
+SELECT vsql_trgm.trgm_show('€100');
+SELECT vsql_trgm.trgm_show('a→b≠c');
+--echo # U+1F600 (grinning face emoji)
+SELECT vsql_trgm.trgm_show(CONCAT('ok', UNHEX('F09F9880'), 'ab'));
+SELECT vsql_trgm.trgm_show('5µm');
+SELECT vsql_trgm.trgm_similarity(CONCAT(UNHEX('EFBBBF'), 'abc'), 'abc');
+SELECT vsql_trgm.trgm_word_similarity('José', 'Señor José García');
+
+--echo #
+--echo # Mixed ASCII and CJK in one word, and as separate words
+--echo #
+SELECT vsql_trgm.trgm_show('SQL数据');
+SELECT vsql_trgm.trgm_show('SQL 数据');
+SELECT vsql_trgm.trgm_similarity('MySQL数据库', 'mysql数据库');
+SELECT vsql_trgm.trgm_strict_word_similarity('数据', 'SQL 数据 库');
+
+--echo #
+--echo # Combining marks are word characters: Thai, Hindi and NFD José stay whole
+--echo #
+SELECT vsql_trgm.trgm_show('สวัสดี');
+SELECT vsql_trgm.trgm_show('हिन्दी');
+SELECT vsql_trgm.trgm_show(CONVERT(X'4A6F7365CC81' USING utf8mb4));
+
+--echo #
+--echo # Variation selectors and enclosing marks separate words
+--echo #
+SELECT vsql_trgm.trgm_show('❤️') AS heart_vs16;
+SELECT vsql_trgm.trgm_similarity('❤️', '☀️') AS heart_sun_vs16;
+SELECT vsql_trgm.trgm_show('1️⃣') AS keycap_one;
+
+--echo #
+--echo # 4-byte characters: U+10400 lowercases to U+10428; U+20000 is a CJK ideograph
+--echo #
+SELECT vsql_trgm.trgm_show('𐐀𐐁') AS show_deseret;
+SELECT vsql_trgm.trgm_similarity('𐐀𐐁', '𐐨𐐩') AS sim_deseret;
+SELECT vsql_trgm.trgm_show('𠀀𠀁') AS show_ext_b;
+
+--echo #
+--echo # Case pairs at stride 2 (Latin Extended-A)
+--echo #
+SELECT vsql_trgm.trgm_show('ĀĂĄ');
+SELECT vsql_trgm.trgm_similarity('ĀĂĄ', 'āăą');
+
+--echo #
+--echo # Simple lowercase: Σ becomes σ, not final ς; İ (U+0130) becomes i
+--echo #
+SELECT vsql_trgm.trgm_show('ΟΔΟΣ');
+SELECT vsql_trgm.trgm_show('İx');
+
+--echo #
+--echo # Malformed UTF-8: the server rejects the argument before the function runs
+--echo #
+--error 3854
+SELECT vsql_trgm.trgm_show(UNHEX('6162FF6364'));
+--error 3854
+SELECT vsql_trgm.trgm_show(UNHEX('6162E6'));
+--error 3854
+SELECT vsql_trgm.trgm_show(UNHEX('C0AF6162'));
+--error 3854
+SELECT vsql_trgm.trgm_similarity(UNHEX('E695B0E68DAEE5BA'), '数据');
+
+--echo #
+--echo # The server converts a latin1 column to utf8mb4 before the call
+--echo #
+CREATE TABLE t_latin1 (c VARCHAR(10) CHARACTER SET latin1);
+INSERT INTO t_latin1 VALUES ('José');
+SELECT vsql_trgm.trgm_show(c), vsql_trgm.trgm_show(CONVERT(c USING utf8mb4)) FROM t_latin1;
+DROP TABLE t_latin1;
+
+UNINSTALL EXTENSION vsql_trgm;
